@@ -1,32 +1,43 @@
-from flask import Flask, request, jsonify
+import json
 import logging
 
-app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 sessionStorage = {}
 
 
-@app.route('/', methods=['GET'])
-def index():
-    return 'OK'
+def handler(request):
+    from http.server import BaseHTTPRequestHandler
 
+    class Response:
+        def __init__(self, status_code=200, body="", headers=None):
+            self.status_code = status_code
+            self.body = body
+            self.headers = headers or {}
 
-@app.route('/post', methods=['POST'])
-@app.route('/api/post', methods=['POST'])
-def main():
-    logging.info(f'Request: {request.json!r}')
+    # GET — health check
+    if request.method == 'GET':
+        return Response(200, 'OK')
+
+    # POST — обработка запроса от Алисы
+    body = json.loads(request.body)
+    logging.info(f'Request: {body!r}')
 
     response = {
-        'session': request.json['session'],
-        'version': request.json['version'],
+        'session': body['session'],
+        'version': body['version'],
         'response': {
             'end_session': False
         }
     }
 
-    handle_dialog(request.json, response)
-    logging.info(f'Response:  {response!r}')
-    return jsonify(response)
+    handle_dialog(body, response)
+    logging.info(f'Response: {response!r}')
+
+    return Response(
+        status_code=200,
+        body=json.dumps(response, ensure_ascii=False),
+        headers={'Content-Type': 'application/json'}
+    )
 
 
 def handle_dialog(req, res):

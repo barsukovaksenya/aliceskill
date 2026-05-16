@@ -1,18 +1,8 @@
 {
-  "builds": [
+  "rewrites": [
     {
-      "src": "api/post.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/post",
-      "dest": "api/post.py"
-    },
-    {
-      "src": "/api/post",
-      "dest": "api/post.py"
+      "source": "/post",
+      "destination": "/api"
     }
   ]
 }
