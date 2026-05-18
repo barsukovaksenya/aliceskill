@@ -7,6 +7,21 @@ logging.basicConfig(level=logging.INFO)
 
 sessionStorage = {}
 
+ANIMALS = ['слон', 'кролик']
+
+ANIMAL_FORMS = {
+    'слон': {
+        'accusative': 'слона',
+        'market_url': 'https://market.yandex.ru/search?text=слон',
+    },
+    'кролик': {
+        'accusative': 'кролика',
+        'market_url': 'https://market.yandex.ru/search?text=кролик',
+    },
+}
+
+AGREEMENT_WORDS = ('ладно', 'куплю', 'покупаю', 'хорошо')
+
 
 @app.route('/post', methods=['POST'])
 def main():
@@ -27,34 +42,66 @@ def main():
     return jsonify(response)
 
 
+def reset_suggests(user_id, animal):
+    sessionStorage[user_id] = {
+        'animal': animal,
+        'suggests': [
+            "Не хочу.",
+            "Не буду.",
+            "Отстань!",
+        ],
+    }
+
+
 def handle_dialog(req, res):
     user_id = req['session']['user_id']
 
     if req['session']['new']:
-        sessionStorage[user_id] = {
-            'suggests': [
-                "Не хочу.",
-                "Не буду.",
-                "Отстань!",
-            ]
-        }
-        res['response']['text'] = 'Привет! Купи слона!'
+        reset_suggests(user_id, ANIMALS[0])
+        res['response']['text'] = f'Привет! Купи {ANIMAL_FORMS[ANIMALS[0]]["accusative"]}!'
         res['response']['buttons'] = get_suggests(user_id)
         return
 
+    animal = sessionStorage.get(user_id, {}).get('animal', ANIMALS[0])
+
     utterance_words = req['request']['original_utterance'].lower().split()
-    if any(word in utterance_words for word in ('ладно', 'куплю', 'покупаю', 'хорошо')):
-        res['response']['text'] = 'Слона можно найти на Яндекс.Маркете!'
+    if any(word in utterance_words for word in AGREEMENT_WORDS):
+        animal_acc = ANIMAL_FORMS[animal]['accusative']
+        market_url = ANIMAL_FORMS[animal]['market_url']
+
+        current_index = ANIMALS.index(animal)
+        if current_index + 1 < len(ANIMALS):
+            next_animal = ANIMALS[current_index + 1]
+            next_animal_acc = ANIMAL_FORMS[next_animal]['accusative']
+            reset_suggests(user_id, next_animal)
+            res['response']['text'] = (
+                f'{animal_acc.capitalize()} можно найти на Яндекс.Маркете! '
+                f'А теперь купи {next_animal_acc}!'
+            )
+            res['response']['buttons'] = [
+                {
+                    'title': f'Купить {animal_acc}',
+                    'url': market_url,
+                    'hide': True,
+                },
+                *get_suggests(user_id),
+            ]
+            return
+
+        res['response']['text'] = f'{animal_acc.capitalize()} можно найти на Яндекс.Маркете!'
         res['response']['end_session'] = True
         return
 
-    res['response']['text'] = \
-        f"Все говорят '{req['request']['original_utterance']}', а ты купи слона!"
+    animal_acc = ANIMAL_FORMS[animal]['accusative']
+    res['response']['text'] = (
+        f"Все говорят '{req['request']['original_utterance']}', а ты купи {animal_acc}!"
+    )
     res['response']['buttons'] = get_suggests(user_id)
 
 
 def get_suggests(user_id):
     session = sessionStorage[user_id]
+    animal = session.get('animal', ANIMALS[0])
 
     suggests = [
         {'title': suggest, 'hide': True}
@@ -67,7 +114,7 @@ def get_suggests(user_id):
     if len(suggests) < 2:
         suggests.append({
             "title": "Ладно",
-            "url": "https://market.yandex.ru/search?text=слон",
+            "url": ANIMAL_FORMS[animal]['market_url'],
             "hide": True
         })
 
